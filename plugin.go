@@ -11,7 +11,7 @@ type plugin struct {
 }
 
 func NewPluginConfig() config.PluginConfig {
-	return config.PluginConfig{}
+	return config.NewPluginConfig()
 }
 
 type Plugin interface {
