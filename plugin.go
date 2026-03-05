@@ -91,7 +91,7 @@ func (p *plugin) Start() {
 	p.workersWg.Go(p.requestQueue.Run)
 	p.workersWg.Go(p.requestRetryingQueue.Run)
 	//p.workersWg.Go(func() { p.worker.Run(ctx) })
-	//go func() { p.poll(ctx) }()
+	go func() { p.poll(ctx) }()
 	p.running = true
 }
 
@@ -132,4 +132,67 @@ func (p *plugin) processConfig() {
 			configuredTunnel.Name)
 		p.tunnels[configuredTunnel.Name] = instance
 	}
+}
+
+func (p *plugin) poll(ctx context.Context) {
+	// Initial pause
+	timer := time.NewTimer(20 * time.Second)
+
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return
+	case <-timer.C:
+	}
+
+	p.enqueueRefresh()
+
+	// Refresh every 4 hours
+	ticker := time.NewTicker(4 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			p.enqueueRefresh()
+		}
+	}
+}
+
+func (p *plugin) enqueueRefresh() {
+	err := p.container.EnqueueOnPluginGoRoutine(func() {
+		refreshError := p.refresh()
+
+		if refreshError != nil {
+			fmt.Printf("%T: Error enqueueing refresh: %v\n", p, refreshError)
+		}
+	})
+
+	if err != nil {
+		fmt.Printf("%T: Unable to enque refresh: %v\n", p, err)
+	}
+}
+
+func (p *plugin) refresh() error {
+	if !p.running {
+		return fmt.Errorf("plugin is not running")
+	}
+
+	errors := make([]error, 0)
+
+	for _, tunnel := range p.tunnels {
+		err := tunnel.Refresh()
+
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("errors encountered during refresh: %v", errors)
+	}
+
+	return nil
 }
