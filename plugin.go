@@ -10,6 +10,7 @@ import (
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/config"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/common"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/tunnel"
+	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/worker"
 	spi "github.com/avanha/pmaas-spi"
 )
 
@@ -21,6 +22,7 @@ type plugin struct {
 	requestCh            chan common.BrokerRequest
 	requestQueue         *queue.RequestQueue[common.BrokerRequest]
 	requestRetryingQueue *queue.RetryingRequestQueue[common.BrokerRequest, common.BrokerResult]
+	worker               *worker.Worker
 	workersWg            sync.WaitGroup
 	cancelFn             context.CancelFunc
 	tunnels              map[string]*tunnel.Tunnel
@@ -55,6 +57,7 @@ func (p *plugin) Init(container spi.IPMAASContainer) {
 		isFailedResult,
 		canRetryRequest,
 		p.requestQueue)
+	p.worker = worker.NewWorker(p.requestCh, p.pluginConfig.Username, p.pluginConfig.UpdateKey)
 }
 
 func getResultChannel(request *common.BrokerRequest) chan common.BrokerResult {
@@ -86,13 +89,13 @@ func canRetryRequest(_ *common.BrokerRequest, _ *common.BrokerResult,
 
 func (p *plugin) Start() {
 	//p.registerEntities()
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	p.cancelFn = cancel
 	p.workersWg.Go(p.requestQueue.Run)
 	p.workersWg.Go(p.requestRetryingQueue.Run)
-	//p.workersWg.Go(func() { p.worker.Run(ctx) })
-	go func() { p.poll(ctx) }()
+	p.workersWg.Go(func() { p.worker.Run(ctx) })
 	p.running = true
+	go func() { p.poll(ctx) }()
 }
 
 func (p *plugin) Stop() chan func() {
@@ -127,6 +130,8 @@ func (p *plugin) nextEntityId() int {
 func (p *plugin) processConfig() {
 	for _, configuredTunnel := range p.pluginConfig.Tunnels {
 		instance := tunnel.NewTunnel(
+			p.container,
+			p.enqueueRequest,
 			fmt.Sprintf("HE_Tunnelbroker_Tunnel_%d", p.nextEntityId()),
 			configuredTunnel.Id,
 			configuredTunnel.Name)
@@ -136,7 +141,7 @@ func (p *plugin) processConfig() {
 
 func (p *plugin) poll(ctx context.Context) {
 	// Initial pause
-	timer := time.NewTimer(20 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
 
 	select {
 	case <-ctx.Done():
@@ -182,8 +187,8 @@ func (p *plugin) refresh() error {
 
 	errors := make([]error, 0)
 
-	for _, tunnel := range p.tunnels {
-		err := tunnel.Refresh()
+	for _, tun := range p.tunnels {
+		err := tun.Refresh()
 
 		if err != nil {
 			errors = append(errors, err)
@@ -195,4 +200,21 @@ func (p *plugin) refresh() error {
 	}
 
 	return nil
+}
+
+// enqueueRequest sends a request to the plugin's worker(s) if the plugin is running.
+// Returns an error if unable to add to the queue.  Must be called from the main plugin goroutine since it
+// reads the running state of the plugin.
+func (p *plugin) enqueueRequest(request common.BrokerRequest) error {
+	if !p.running {
+		return fmt.Errorf("unable to enqueue request, plugin is not running")
+	}
+
+	err := p.requestRetryingQueue.Enqueue(&request)
+
+	if err != nil {
+		return fmt.Errorf("unable to enqueue request: %w", err)
+	}
+
+	return err
 }

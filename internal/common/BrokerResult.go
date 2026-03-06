@@ -1,9 +1,9 @@
 package common
 
-type BrokerResult struct {
-	Error   error
-	Message string
-}
+import "github.com/avanha/pmaas-plugin-hetunnelbroker/data"
 
-type TunnelInfoResult struct {
+type BrokerResult struct {
+	Error      error
+	Message    string
+	TunnelData data.TunnelData
 }

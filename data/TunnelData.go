@@ -1,6 +1,9 @@
 package data
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 type TunnelData struct {
 	LastUpdateTime     time.Time
@@ -11,4 +14,11 @@ type TunnelData struct {
 	UpdateErrorCount   int
 	LastError          error
 	LastErrorTime      time.Time
+	Description        string
+	ServerIpV4Address  net.IP
+	ServerIpV6Address  net.IP
+	ClientIpV4Address  net.IP
+	ClientIpV6Address  net.IP
+	Routed64Net        net.IPNet
+	Routed48Net        net.IPNet
 }
