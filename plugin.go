@@ -8,8 +8,10 @@ import (
 
 	"github.com/avanha/pmaas-common/queue"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/config"
+	"github.com/avanha/pmaas-plugin-hetunnelbroker/data"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/entities"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/common"
+	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/http"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/tunnel"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/worker"
 	spi "github.com/avanha/pmaas-spi"
@@ -26,6 +28,7 @@ type plugin struct {
 	worker               *worker.Worker
 	workersWg            sync.WaitGroup
 	cancelFn             context.CancelFunc
+	httpHandler          *http.Handler
 	tunnels              map[string]*tunnel.Tunnel
 }
 
@@ -42,6 +45,7 @@ func NewPlugin(pluginConfig config.PluginConfig) Plugin {
 		pluginConfig: pluginConfig,
 		tunnels:      make(map[string]*tunnel.Tunnel),
 		requestCh:    make(chan common.BrokerRequest),
+		httpHandler:  http.NewHandler(),
 	}
 
 	return instance
@@ -50,6 +54,7 @@ func NewPlugin(pluginConfig config.PluginConfig) Plugin {
 func (p *plugin) Init(container spi.IPMAASContainer) {
 	p.container = container
 	p.processConfig()
+	p.httpHandler.Init(container, &entityStoreAdapter{parent: p})
 	p.requestQueue = queue.NewRequestQueue(p.requestCh)
 	p.requestRetryingQueue = queue.NewRetryingRequestQueue(
 		getResultChannel,
@@ -255,4 +260,54 @@ func (p *plugin) enqueueRequest(request common.BrokerRequest) error {
 	}
 
 	return err
+}
+
+// getStatusAndEntities retrieves the plugin status and a list of currently registered trackable entities.
+// It does not perform any synchronization, so it should only be called from the plugin's main goroutine.
+func (p *plugin) getStatusAndEntities() common.StatusAndEntities {
+	queStats := p.requestQueue.Stats()
+	retryQueueStats := p.requestRetryingQueue.Stats()
+	var totalSuccessCount, totalErrorCount int
+	var lastError error
+	var lastErrorMessage string
+	var lastErrorTime time.Time
+
+	tunnelDatas := make([]data.TunnelData, len(p.tunnels))
+	i := 0
+
+	for _, entity := range p.tunnels {
+		entityData := entity.Data()
+		tunnelDatas[i] = entityData
+		totalSuccessCount = totalSuccessCount + entityData.GetSuccessCount + entityData.UpdateSuccessCount
+		totalErrorCount = totalErrorCount + entityData.GetErrorCount + entityData.UpdateErrorCount
+
+		if entityData.LastErrorTime.After(lastErrorTime) {
+			lastErrorTime = entityData.LastErrorTime
+			lastError = entityData.LastError
+		}
+
+		i++
+	}
+
+	if lastError != nil {
+		lastErrorMessage = lastError.Error()
+	}
+
+	return common.StatusAndEntities{
+		Status: data.PluginStatus{
+			CurrentQueueSize:       queStats.CurrentCount,
+			PeakQueueSize:          queStats.PeakCount,
+			PeakQueueSizeTime:      queStats.PeakCountTime,
+			CurrentRetryQueueSize:  retryQueueStats.CurrentCount,
+			PeakRetryQueueSize:     retryQueueStats.PeakCount,
+			PeakRetryQueueSizeTime: retryQueueStats.PeakCountTime,
+			PeakFailedAttempts:     retryQueueStats.PeakFailedAttempts,
+			PeakFailedAttemptsTime: retryQueueStats.PeakFailedAttemptsTime,
+			TotalSuccessCount:      totalSuccessCount,
+			TotalErrorCount:        totalErrorCount,
+			LastErrorMessage:       lastErrorMessage,
+			LastErrorTime:          lastErrorTime,
+		},
+		Tunnels: tunnelDatas,
+	}
 }

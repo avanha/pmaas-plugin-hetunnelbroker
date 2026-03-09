@@ -6,6 +6,7 @@ import (
 )
 
 type TunnelData struct {
+	Name               string
 	LastUpdateTime     time.Time
 	LastModifiedTime   time.Time
 	GetSuccessCount    int

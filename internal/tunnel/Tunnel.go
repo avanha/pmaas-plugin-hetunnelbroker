@@ -37,6 +37,10 @@ func NewTunnel(
 	}
 }
 
+func (t *Tunnel) Data() data.TunnelData {
+	return t.currentData
+}
+
 func (t *Tunnel) Refresh() error {
 	resultCh := make(chan common.BrokerResult)
 	request := common.BrokerRequest{

@@ -1,0 +1,3 @@
+<div class="entity-he-tunnel">
+    <div class="name">{{.Name}}</div>
+</div>
