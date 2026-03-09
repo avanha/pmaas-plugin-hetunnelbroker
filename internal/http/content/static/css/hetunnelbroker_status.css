@@ -1,0 +1,39 @@
+.entity-he-tunnel-status {
+    display: flex;
+    flex-flow: column;
+}
+
+.entity-he-tunnel-status .monospace {
+    font-size: 10pt;
+    font-family: "Roboto", "Menlo", "Consolas", monospace;
+}
+
+.entity-he-tunnel-status .container {
+    display: flex;
+    flex-flow: row wrap;
+    margin: 0 0 5px 0;
+}
+
+.entity-he-tunnel-status .container > :not(:last-child) {
+    margin-right: 10px;
+}
+
+.entity-he-tunnel-status .container > * {
+    white-space: nowrap;
+}
+
+.entity-he-tunnel-status .container .container {
+    margin-bottom: 0;
+}
+
+.entity-he-tunnel-status .label::after {
+    content: ":";
+}
+
+.entity-he-tunnel-status .group-label {
+    font-weight: bold;
+}
+
+.entity-he-tunnel-status .group-label::after {
+    content: " - ";
+}
