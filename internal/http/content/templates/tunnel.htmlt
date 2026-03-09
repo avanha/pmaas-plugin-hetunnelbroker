@@ -1,3 +1,73 @@
 <div class="entity-he-tunnel">
     <div class="name">{{.Name}}</div>
+    {{if ne .Description ""}}
+        <div class="tunnel-value">{{.Description}}</div>
+    {{end}}
+    
+    <div class="tunnel-attributes container">
+        <div class="tunnel-server container">
+            <div class="label">Server IPv4</div>
+            <div class="value monospace">{{.ServerIpV4Address}}</div>
+        </div>
+        <div class="tunnel-server-v6 container">
+            <div class="label">Server IPv6</div>
+            <div class="value monospace">{{.ServerIpV6Address}}</div>
+        </div>
+    </div>
+    
+    <div class="tunnel-attributes container">
+        <div class="tunnel-client container">
+            <div class="label">Client IPv4</div>
+            <div class="value monospace">{{.ClientIpV4Address}}</div>
+        </div>
+        <div class="tunnel-client-v6 container">
+            <div class="label">Client IPv6</div>
+            <div class="value monospace">{{.ClientIpV6Address}}</div>
+        </div>
+    </div>
+    
+    <div class="tunnel-attributes container">
+        <div class="tunnel-routed container">
+            <div class="label">Routed /64</div>
+            <div class="value monospace">{{.Routed64Net}}</div>
+        </div>
+        <div class="tunnel-routed-48 container">
+            <div class="label">Routed /48</div>
+            <div class="value monospace">{{.Routed48Net}}</div>
+        </div>
+    </div>
+
+    <div class="last-update-time container">
+         <div class="label">Last Updated</div>
+         {{if .LastUpdateTime.IsZero}}
+            <div class="timestamp">Never</div>
+         {{else}}
+            <div class="timestamp">{{.LastUpdateTime.Format "2006-01-02 3:04:05 PM"}}</div>
+         {{end}}
+    </div>
+    <div class="last-modified-time container">
+         <div class="label">Last Modified</div>
+         {{if .LastModifiedTime.IsZero}}
+            <div class="timestamp">Never</div>
+         {{else}}
+            <div class="timestamp">{{.LastModifiedTime.Format "2006-01-02 3:04:05 PM"}}</div>
+         {{end}}
+    </div>
+    <div class="tunnel-stats-gets container">
+        <div class="label">Retrievals</div>
+        <div class="value">{{.GetSuccessCount}} / {{.GetErrorCount}}</div>
+        <div class="">Success / Failure</div>
+    </div>
+    <div class="tunnel-stats-updates container">
+        <div class="label">Updates</div>
+        <div class="value">{{.UpdateSuccessCount}} / {{.UpdateErrorCount}}</div>
+        <div class="">Success / Failure</div>
+    </div>
+    {{if ne .LastError nil}}
+    <div class="tunnel-error container">
+        <div class="label">Last Error</div>
+        <div class="value">{{.LastError}}</div>
+        <div class="timestamp">({{.LastErrorTime.Format "2006-01-02 3:04:05 PM"}})</div>
+    </div>
+    {{end}}
 </div>
