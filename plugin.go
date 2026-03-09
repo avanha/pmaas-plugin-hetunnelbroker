@@ -8,6 +8,7 @@ import (
 
 	"github.com/avanha/pmaas-common/queue"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/config"
+	"github.com/avanha/pmaas-plugin-hetunnelbroker/entities"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/common"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/tunnel"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/worker"
@@ -88,7 +89,7 @@ func canRetryRequest(_ *common.BrokerRequest, _ *common.BrokerResult,
 }
 
 func (p *plugin) Start() {
-	//p.registerEntities()
+	p.registerEntities()
 	ctx, cancel := context.WithCancel(context.Background())
 	p.cancelFn = cancel
 	p.workersWg.Go(p.requestQueue.Run)
@@ -116,7 +117,7 @@ func (p *plugin) Stop() chan func() {
 
 func (p *plugin) onWorkersStopped(callbackCh chan func()) {
 	fmt.Printf("%T Workers stopped, deregistering entities...\n", p)
-	//p.deregisterEntities()
+	p.deregisterEntities()
 	close(callbackCh)
 }
 
@@ -136,6 +137,43 @@ func (p *plugin) processConfig() {
 			configuredTunnel.Id,
 			configuredTunnel.Name)
 		p.tunnels[configuredTunnel.Name] = instance
+	}
+}
+
+func (p *plugin) registerEntities() {
+	for _, instance := range p.tunnels {
+		// This lambda captures the plugin instance and the hostInstance
+		// and passes it to the entity manager.  However, entities are deregistered on plugin
+		// stop, so this is OK.
+		var tunnelStubFactoryFn spi.EntityStubFactoryFunc = func() (any, error) {
+			return instance.GetStub(), nil
+		}
+		pmaasId, err := p.container.RegisterEntity(
+			instance.LocalId(),
+			entities.TunnelType,
+			instance.LocalId(),
+			tunnelStubFactoryFn)
+
+		if err != nil {
+			fmt.Printf("%T Error registering %s: %s\n", p, instance.LocalId(), err)
+			continue
+		}
+
+		instance.SetPmaasEntityId(pmaasId)
+	}
+}
+
+func (p *plugin) deregisterEntities() {
+	for _, instance := range p.tunnels {
+		err := p.container.DeregisterEntity(instance.PmaasEntityId())
+
+		if err == nil {
+			instance.ClearPmaasEntityId()
+		} else {
+			fmt.Printf("%TError deregistering %s: %s\n", p, instance.LocalId(), err)
+		}
+
+		instance.CloseStubIfPresent()
 	}
 }
 
