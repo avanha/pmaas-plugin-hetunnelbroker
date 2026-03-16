@@ -26,15 +26,14 @@
         </div>
     </div>
     
-    <div class="tunnel-attributes container">
-        <div class="tunnel-routed container">
-            <div class="label">Routed /64</div>
-            <div class="value monospace">{{.Routed64Net}}</div>
-        </div>
-        <div class="tunnel-routed-48 container">
-            <div class="label">Routed /48</div>
-            <div class="value monospace">{{.Routed48Net}}</div>
-        </div>
+    <div class="tunnel-routed-64 container">
+        <div class="label">Routed /64</div>
+        <div class="value monospace">{{.Routed64Net}}</div>
+     </div>
+
+    <div class="tunnel-routed-48 container">
+        <div class="label">Routed /48</div>
+        <div class="value monospace">{{.Routed48Net}}</div>
     </div>
 
     <div class="last-update-time container">
