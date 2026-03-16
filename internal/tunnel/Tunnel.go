@@ -28,13 +28,16 @@ func NewTunnel(
 	localId string,
 	tunnelId string,
 	name string) *Tunnel {
-	return &Tunnel{
+	tunnel := &Tunnel{
 		container:        container,
 		requestHandlerFn: requestHandlerFn,
 		localId:          localId,
 		tunnelId:         tunnelId,
 		name:             name,
 	}
+	tunnel.currentData.Name = name
+
+	return tunnel
 }
 
 func (t *Tunnel) Data() data.TunnelData {
@@ -57,6 +60,7 @@ func (t *Tunnel) Refresh() error {
 		return fmt.Errorf("failed to enqueue tunnel info %s retrieval: %v", t.name, err)
 	}
 
+	// Waits for the result channel to return a value, and process it on the main plugin goroutine.
 	go readAndProcessResult(t, resultCh, t.processGetTunnelInfoResult, "Tunnel info retrieval")
 
 	return nil
@@ -65,7 +69,7 @@ func (t *Tunnel) Refresh() error {
 func (t *Tunnel) processGetTunnelInfoResult(result common.BrokerResult) {
 	if result.Error == nil {
 		fmt.Printf("%T tunnel %s: %s\n", t, t.name, result.Message)
-		//t.updateData(&result.CurrentData)
+		t.updateData(&result.TunnelData)
 		t.currentData.GetSuccessCount++
 	} else {
 		fmt.Printf("%T Error retrieving tunnel %s info: %v\n", t, t.name, result.Error)
@@ -73,6 +77,17 @@ func (t *Tunnel) processGetTunnelInfoResult(result common.BrokerResult) {
 		t.currentData.LastErrorTime = time.Now()
 		t.currentData.GetErrorCount++
 	}
+}
+
+func (t *Tunnel) updateData(newData *data.TunnelData) {
+	t.currentData.Description = newData.Description
+	t.currentData.LastUpdateTime = newData.LastUpdateTime
+	t.currentData.ClientIpV4Address = newData.ClientIpV4Address
+	t.currentData.ClientIpV6Address = newData.ClientIpV6Address
+	t.currentData.ServerIpV4Address = newData.ServerIpV4Address
+	t.currentData.ServerIpV6Address = newData.ServerIpV6Address
+	t.currentData.Routed64Net = newData.Routed64Net
+	t.currentData.Routed48Net = newData.Routed48Net
 }
 
 // GetStub returns a proxy struct that implements the entities.Tunnel interface.  The function ensures
