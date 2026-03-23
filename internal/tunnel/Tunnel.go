@@ -146,12 +146,12 @@ func (t *Tunnel) updateData(newData *data.TunnelData) {
 
 func (t *Tunnel) processUpdateTunnelClientIpV4AddressResult(result common.BrokerResult) {
 	if result.Error == nil {
-		fmt.Printf("Updated tunnel %s successfully: %s\n", t.Name, result.Message)
+		fmt.Printf("Updated tunnel %s successfully: %s\n", t.name, result.Message)
 		t.updateData(&result.TunnelData)
 		t.currentData.LastModifiedTime = result.TunnelData.LastModifiedTime
 		t.currentData.UpdateSuccessCount++
 	} else {
-		fmt.Printf("Error updating tunnel %s: %v\n", t.Name, result.Error)
+		fmt.Printf("Error updating tunnel %s: %v\n", t.name, result.Error)
 		t.currentData.LastError = result.Error
 		t.currentData.LastErrorTime = time.Now()
 		t.currentData.UpdateErrorCount++

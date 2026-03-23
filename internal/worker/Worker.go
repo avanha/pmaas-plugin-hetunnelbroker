@@ -121,7 +121,7 @@ func (w *Worker) processUpdateTunnelClientIpV4Address(
 			tunnelData,
 			"Client IPv4 address already set to requested value",
 			"Tunnel client IPv4 address update")
-
+		return
 	}
 
 	err := w.updateTunnelClientIpV4Address(req.TunnelId, req.NewAddress)
