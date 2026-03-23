@@ -140,7 +140,8 @@ func (p *plugin) processConfig() {
 			p.enqueueRequest,
 			fmt.Sprintf("HE_Tunnelbroker_Tunnel_%d", p.nextEntityId()),
 			configuredTunnel.Id,
-			configuredTunnel.Name)
+			configuredTunnel.Name,
+			configuredTunnel.OnEntityStubAvailableListeners())
 		p.tunnels[configuredTunnel.Name] = instance
 	}
 }
@@ -165,6 +166,7 @@ func (p *plugin) registerEntities() {
 		}
 
 		instance.SetPmaasEntityId(pmaasId)
+		instance.ProcessConfiguredListeners(p.container)
 	}
 }
 

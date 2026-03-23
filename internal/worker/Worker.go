@@ -58,6 +58,8 @@ func (w *Worker) processRequest(request *common.BrokerRequest) {
 	case common.BrokerRequestTypeGetTunnelInfo:
 		w.processGetTunnelInfoRequest(&request.GetTunnelInfoRequest, request.ResultCh)
 		break
+	case common.BrokerRequestTypeUpdateTunnelClientIpV4Address:
+		w.processUpdateTunnelClientIpV4Address(&request.UpdateTunnelClientIpV4AddressRequest, request.ResultCh)
 	}
 }
 
@@ -83,11 +85,63 @@ func (w *Worker) processGetTunnelInfoRequest(
 
 	completeRequestWithSuccess(
 		resultCh,
-		&tunnelInfo,
-		time.Now(),
+		buildTunnelData(&tunnelInfo, time.Now()),
 		"Retrieved successfully",
 		"Tunnel info retrieval")
 
+}
+
+func (w *Worker) processUpdateTunnelClientIpV4Address(
+	req *common.UpdateTunnelClientIpV4AddressRequest,
+	resultCh chan<- common.BrokerResult) {
+
+	currentClientIpV4Address := req.CurrentData.ClientIpV4Address
+	var tunnelData data.TunnelData
+
+	if req.CurrentData.LastUpdateTime.Before(time.Now().Add(time.Duration(5) * time.Minute)) {
+		tunnelInfo, err := w.getTunnelInfo(req.TunnelId)
+
+		if err != nil {
+			completeRequestWithError(
+				resultCh,
+				fmt.Errorf("error updating tunnel client IPv4 address: %w", err),
+				"Tunnel client IPv4 address update failed")
+			return
+		}
+
+		currentClientIpV4Address = net.ParseIP(tunnelInfo.ClientV4)
+		tunnelData = buildTunnelData(&tunnelInfo, time.Now())
+	} else {
+		tunnelData = req.CurrentData
+	}
+
+	if req.NewAddress.Equal(currentClientIpV4Address) {
+		completeRequestWithSuccess(
+			resultCh,
+			tunnelData,
+			"Client IPv4 address already set to requested value",
+			"Tunnel client IPv4 address update")
+
+	}
+
+	err := w.updateTunnelClientIpV4Address(req.TunnelId, req.NewAddress)
+
+	if err != nil {
+		completeRequestWithError(
+			resultCh,
+			fmt.Errorf("error updating tunnel client IPv4 address: %w", err),
+			"Tunnel client IPv4 address update failed")
+		return
+	}
+
+	tunnelData.ClientIpV4Address = req.NewAddress
+	tunnelData.LastModifiedTime = time.Now()
+
+	completeRequestWithSuccess(
+		resultCh,
+		tunnelData,
+		"Client IPv4 address updated successfully",
+		"Tunnel client IPv4 address update")
 }
 
 func (w *Worker) getTunnelInfo(tunnelId string) (messages.Tunnel, error) {
@@ -118,6 +172,17 @@ func (w *Worker) getTunnelInfo(tunnelId string) (messages.Tunnel, error) {
 	return tunnels.Tunnel[0], nil
 }
 
+func (w *Worker) updateTunnelClientIpV4Address(tunnelId string, newAddress net.IP) error {
+	uri := fmt.Sprintf("https://ipv4.tunnelbroker.net/nic/update?username=%s&password=%s&hostname=%s&myip=%s",
+		w.username, w.updateKey, tunnelId, newAddress.String())
+
+	if err := w.executeHttpGet(uri, nil); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *Worker) executeHttpGet(uri string, result any) error {
 	response, err := http.Get(uri)
 
@@ -132,10 +197,12 @@ func (w *Worker) executeHttpGet(uri string, result any) error {
 		return fmt.Errorf("error reading response body: %w", err)
 	}
 
-	err = xml.Unmarshal(responseBytes, result)
+	if result != nil {
+		err = xml.Unmarshal(responseBytes, result)
 
-	if err != nil {
-		return fmt.Errorf("error unmarshalling response: %w (body: %s)", err, string(responseBytes))
+		if err != nil {
+			return fmt.Errorf("error unmarshalling response: %w (body: %s)", err, string(responseBytes))
+		}
 	}
 
 	return nil
@@ -164,16 +231,13 @@ func completeRequestWithError(resultCh chan<- common.BrokerResult, err error, lo
 
 func completeRequestWithSuccess(
 	resultCh chan<- common.BrokerResult,
-	tunnelInfo *messages.Tunnel,
-	lastUpdateTime time.Time,
+	tunnelData data.TunnelData,
 	message string,
 	logMessage string) {
 
 	if resultCh == nil {
 		fmt.Printf("%s: %s\n", logMessage, message)
 	} else {
-		tunnelData := buildTunnelData(tunnelInfo, lastUpdateTime)
-
 		resultCh <- common.BrokerResult{
 			Message:    message,
 			TunnelData: tunnelData,

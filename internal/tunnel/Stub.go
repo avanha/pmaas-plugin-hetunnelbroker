@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"fmt"
+	"net"
 	"sync/atomic"
 
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/entities"
@@ -34,11 +35,27 @@ func NewStub(pmaasEntityId string, entityWrapper *spicommon.ThreadSafeEntityWrap
 }
 
 func (s *Stub) Close() {
+	closeFn := s.closeFn
 
+	if closeFn == nil {
+		return
+	}
+
+	err := closeFn()
+
+	if err != nil {
+		fmt.Printf("Failed to close Stub %s: %v", s.Name(), err)
+	}
 }
 
 func (s *Stub) Name() string {
 	return spicommon.ThreadSafeEntityWrapperExecValueFunc(
 		s.entityWrapperReference.Load(),
 		func(target entities.Tunnel) string { return target.Name() })
+}
+
+func (s *Stub) UpdateClientIpV4Address(value net.IP) error {
+	return spicommon.ThreadSafeEntityWrapperExecValueFunc(
+		s.entityWrapperReference.Load(),
+		func(target entities.Tunnel) error { return target.UpdateClientIpV4Address(value) })
 }
