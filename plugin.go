@@ -128,7 +128,7 @@ func (p *plugin) onWorkersStopped(callbackCh chan func()) {
 
 func (p *plugin) nextEntityId() int {
 	result := p.entityCounter
-	p.entityCounter = p.entityCounter + 1
+	p.entityCounter++
 
 	return result
 }
@@ -187,6 +187,7 @@ func (p *plugin) deregisterEntities() {
 func (p *plugin) poll(ctx context.Context) {
 	// Initial pause
 	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
 
 	select {
 	case <-ctx.Done():
@@ -230,7 +231,7 @@ func (p *plugin) refresh() error {
 		return fmt.Errorf("plugin is not running")
 	}
 
-	errors := make([]error, 0)
+	errors := make([]error, 0, len(p.tunnels))
 
 	for _, tun := range p.tunnels {
 		err := tun.Refresh()
