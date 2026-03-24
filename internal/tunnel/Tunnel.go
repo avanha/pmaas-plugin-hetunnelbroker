@@ -97,7 +97,7 @@ func (t *Tunnel) Refresh() error {
 }
 
 func (t *Tunnel) UpdateClientIpV4Address(value net.IP) error {
-	fmt.Printf("Received request to update tunnel %s client IPv4 address to %s\n", t.Name, value)
+	fmt.Printf("Received request to update tunnel %s client IPv4 address to %s\n", t.name, value)
 	resultCh := make(chan common.BrokerResult)
 	request := common.BrokerRequest{
 		RequestType: common.BrokerRequestTypeUpdateTunnelClientIpV4Address,
@@ -112,7 +112,7 @@ func (t *Tunnel) UpdateClientIpV4Address(value net.IP) error {
 	err := t.requestHandlerFn(request)
 
 	if err != nil {
-		return fmt.Errorf("failed to enqueue tunnel %s update: %v", t.Name, err)
+		return fmt.Errorf("failed to enqueue tunnel %s update: %v", t.name, err)
 	}
 
 	go readAndProcessResult(t, resultCh, t.processUpdateTunnelClientIpV4AddressResult, "update tunnel client address")
