@@ -14,20 +14,23 @@ import (
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/data"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/common"
 	"github.com/avanha/pmaas-plugin-hetunnelbroker/internal/worker/messages"
+	spicommon "github.com/avanha/pmaas-spi/common"
 )
 
 type Worker struct {
-	requestCh chan common.BrokerRequest
-	username  string
-	updateKey string
-	err       atomic.Value
+	httpClient spicommon.HttpClient
+	requestCh  chan common.BrokerRequest
+	username   string
+	updateKey  string
+	err        atomic.Value
 }
 
 func NewWorker(requestCh chan common.BrokerRequest, usenrame string, updateKey string) *Worker {
 	return &Worker{
-		requestCh: requestCh,
-		username:  usenrame,
-		updateKey: updateKey,
+		httpClient: &spicommon.DefaultHttpClient{},
+		requestCh:  requestCh,
+		username:   usenrame,
+		updateKey:  updateKey,
 	}
 }
 
@@ -40,8 +43,12 @@ func (w *Worker) Run(ctx context.Context) {
 				w.err.Store(fmt.Errorf("heTunnelBroker received unexpected error from context: %w", ctx.Err()))
 			}
 			break
-		case request := <-w.requestCh:
-			w.processRequest(&request)
+		case request, ok := <-w.requestCh:
+			if ok {
+				w.processRequest(&request)
+			} else {
+				run = false
+			}
 			break
 		}
 	}
@@ -184,7 +191,7 @@ func (w *Worker) updateTunnelClientIpV4Address(tunnelId string, newAddress net.I
 }
 
 func (w *Worker) executeHttpGet(uri string, result any) error {
-	response, err := http.Get(uri)
+	response, err := w.httpClient.Get(uri)
 
 	if err != nil {
 		return fmt.Errorf("http get failed: %w", err)
