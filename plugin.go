@@ -51,6 +51,10 @@ func NewPlugin(pluginConfig config.PluginConfig) Plugin {
 	return instance
 }
 
+func (p *plugin) ShortName() string {
+	return "hetunnelbroker"
+}
+
 func (p *plugin) Init(container spi.IPMAASContainer) {
 	p.container = container
 	p.processConfig()
