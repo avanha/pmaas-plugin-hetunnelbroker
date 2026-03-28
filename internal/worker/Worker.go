@@ -25,11 +25,11 @@ type Worker struct {
 	err        atomic.Value
 }
 
-func NewWorker(requestCh chan common.BrokerRequest, usenrame string, updateKey string) *Worker {
+func NewWorker(requestCh chan common.BrokerRequest, username string, updateKey string) *Worker {
 	return &Worker{
 		httpClient: &spicommon.DefaultHttpClient{},
 		requestCh:  requestCh,
-		username:   usenrame,
+		username:   username,
 		updateKey:  updateKey,
 	}
 }

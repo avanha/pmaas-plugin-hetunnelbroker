@@ -30,14 +30,35 @@ const TunnelResponse = `
 
 // fakeHttpClient is a mock implementation of HttpClient for testing
 type fakeHttpClient struct {
-	lastRequestedURL string
-	responseBody     string
-	responseStatus   int
-	responseErr      error
+	lastRequestedURL       string
+	lastRequestContentType string
+	lastRequestBody        []byte
+	responseBody           string
+	responseStatus         int
+	responseErr            error
 }
 
 func (f *fakeHttpClient) Get(url string) (*http.Response, error) {
 	f.lastRequestedURL = url
+	if f.responseErr != nil {
+		return nil, f.responseErr
+	}
+
+	resp := &http.Response{
+		StatusCode: f.responseStatus,
+		Body:       io.NopCloser(strings.NewReader(f.responseBody)),
+		Header:     make(http.Header),
+	}
+	resp.Header.Set("Content-Type", "application/json")
+	return resp, nil
+}
+
+func (f *fakeHttpClient) Post(url string, contentType string, body io.Reader) (*http.Response, error) {
+	bodyBytes, _ := io.ReadAll(body)
+	f.lastRequestedURL = url
+	f.lastRequestContentType = contentType
+	f.lastRequestBody = bodyBytes
+
 	if f.responseErr != nil {
 		return nil, f.responseErr
 	}
@@ -61,6 +82,11 @@ type blockingFakeHttpClient struct {
 func (b *blockingFakeHttpClient) Get(url string) (*http.Response, error) {
 	<-b.gate // block until the test signals
 	return b.fakeHttpClient.Get(url)
+}
+
+func (b *blockingFakeHttpClient) Post(url string, contentType string, body io.Reader) (*http.Response, error) {
+	<-b.gate // block until the test signals
+	return b.fakeHttpClient.Post(url, contentType, body)
 }
 
 func TestNewWorker(t *testing.T) {
