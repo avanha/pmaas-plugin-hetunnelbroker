@@ -1,8 +1,8 @@
 module github.com/avanha/pmaas-plugin-hetunnelbroker
 
-go 1.26
+go 1.27.1
 
 require (
-	github.com/avanha/pmaas-common v0.0.2
-	github.com/avanha/pmaas-spi v0.0.7
+	github.com/avanha/pmaas-common v0.0.3
+	github.com/avanha/pmaas-spi v0.0.8
 )
